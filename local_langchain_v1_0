@@ -1,0 +1,106 @@
+from langchain_google_vertexai import VertexAI
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+from github import Github
+from datetime import datetime, timedelta
+import pandas as pd
+import os
+from dotenv import load_dotenv
+from google.cloud import aiplatform
+
+# Load environment variables
+load_dotenv()
+
+# Initialize Vertex AI with explicit project configuration
+aiplatform.init(
+    project=os.getenv("GOOGLE_CLOUD_PROJECT"),  # Set in .env file
+    location="us-east1"
+)
+
+# Initialize LLM with Gemini 1.5 Pro (or the latest available)
+llm = VertexAI(
+    model_name="gemini-1.5-pro",  # Use the latest available model
+    temperature=0.3,
+    project=os.getenv("GOOGLE_CLOUD_PROJECT"),
+    location="us-central1"
+)
+
+class LocalGitHubLoader:
+    def __init__(self):
+        self.token = os.getenv("GITHUB_TOKEN")
+        if not self.token:
+            raise ValueError("GITHUB_TOKEN not found in environment variables")
+        self.g = Github(self.token)
+        
+    def get_yesterdays_commits(self, repo_name):
+        repo = self.g.get_repo(repo_name)
+        since = datetime.now() - timedelta(days=1)
+        commits = list(repo.get_commits(since=since))
+        
+        commit_data = []
+        for commit in commits:
+            stats = commit.stats
+            commit_data.append({
+                'time': commit.commit.author.date.strftime("%H:%M"),
+                'message': commit.commit.message.split("\n")[0][:50],
+                'changes': f"+{stats.additions}/-{stats.deletions}",
+                'files': len(list(commit.files)),  # Convert PaginatedList to list
+                'url': commit.html_url
+            })
+        return pd.DataFrame(commit_data)
+
+def create_local_analysis_chain():
+    prompt = PromptTemplate(
+        input_variables=["commits"],
+        template="""
+        Analyze these GitHub commits from yesterday:
+        {commits}
+        
+        Provide:
+        1. 🏆 Key accomplishments
+        2. ⏱ Estimated focus time (based on commit times)
+        3. 🚧 Potential blockers
+        4. ➡️ Recommended next steps
+        
+        Keep it concise with bullet points.
+        """
+    )
+    return LLMChain(llm=llm, prompt=prompt)
+
+def generate_local_report(repo_name):
+    try:
+        loader = LocalGitHubLoader()
+        commits_df = loader.get_yesterdays_commits(repo_name)
+        
+        if commits_df.empty:
+            return "✨ No commits found yesterday - take a victory lap!"
+        
+        analysis_chain = create_local_analysis_chain()
+        analysis = analysis_chain.run(commits=commits_df.to_markdown())
+        
+        return f"""
+        🚀 YESTERDAY'S STANDUP - {datetime.now().strftime('%Y-%m-%d')}
+        ========================================
+        📌 Repository: {repo_name}
+        
+        📝 Commit Summary:
+        {commits_df.to_markdown(index=False)}
+        
+        🔍 Analysis:
+        {analysis}
+        """
+    except Exception as e:
+        return f"❌ Error generating report: {str(e)}"
+
+if __name__ == "__main__":
+    # Create a .env file with:
+    # GOOGLE_CLOUD_PROJECT=your-project-id
+    # GITHUB_TOKEN=your-github-token
+    
+    REPO = "phifouad/test"  
+    
+    # First authenticate with:
+    # gcloud auth application-default login
+    
+    report = generate_local_report(REPO)
+    print(report)
