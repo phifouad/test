@@ -16,7 +16,7 @@ aiplatform.init(
     project=os.getenv("GOOGLE_CLOUD_PROJECT"),  # Set in .env file
     location="us-east1"
 )
-
+u = 'oppala'
 # Initialize LLM with Gemini 1.5 Pro (or the latest available)
 llm = VertexAI(
     model_name="gemini-1.5-pro",  # Use the latest available model
