@@ -58,7 +58,7 @@ def create_local_analysis_chain():
         
         Provide:
         1. 🏆 Key accomplishments
-        2. ⏱ Estimated focus time (based on commit times)
+        2. ⏱ Estimated focus time (based on commit times and 9 to 5 working hours)
         3. 🚧 Potential blockers
         4. ➡️ Recommended next steps
         
