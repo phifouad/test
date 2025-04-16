@@ -17,6 +17,7 @@ aiplatform.init(
     location="us-east1"
 )
 u = 'oppala'
+u = 'nothing'
 # Initialize LLM with Gemini 1.5 Pro (or the latest available)
 llm = VertexAI(
     model_name="gemini-1.5-pro",  # Use the latest available model
